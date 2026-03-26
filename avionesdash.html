@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AeroMetrics — Flight Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg0: #060a0f;
+    --bg1: #0b1017;
+    --bg2: #111820;
+    --bg3: #18222e;
+    --border: #1e3040;
+    --border2: #264055;
+    --accent: #00c8ff;
+    --accent2: #00ffc8;
+    --accent3: #ff6b35;
+    --warn: #ffcc00;
+    --text: #c8dde8;
+    --text2: #6a8fa0;
+    --text3: #3a5a70;
+    --mono: 'Share Tech Mono', monospace;
+    --head: 'Barlow Condensed', sans-serif;
+    --body: 'Barlow', sans-serif;
+    --glow: 0 0 12px rgba(0,200,255,0.25);
+    --glow2: 0 0 20px rgba(0,255,200,0.2);
+  }
+
+  html, body {
+    background: var(--bg0);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 16px 20px; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 16px;
+    position: relative;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    bottom: -2px; left: 0; right: 0;
+    height: 1px;
+    background: var(--accent);
+    box-shadow: var(--glow);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: var(--glow);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 6px rgba(0,200,255,0.3); }
+    50% { box-shadow: 0 0 18px rgba(0,200,255,0.6); }
+  }
+  .logo-text { font-family: var(--head); font-size: 24px; font-weight: 700; letter-spacing: 3px; color: #fff; text-transform: uppercase; }
+  .logo-sub { font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: 2px; display: block; margin-top: -2px; }
+
+  .header-right { display: flex; align-items: center; gap: 20px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 4px 10px;
+    letter-spacing: 1px;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent2);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .clock { font-family: var(--mono); font-size: 13px; color: var(--text2); letter-spacing: 1px; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: var(--bg1);
+    border: 1px solid var(--border);
+  }
+  .filter-label { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 1.5px; align-self: center; text-transform: uppercase; }
+  .filter-sep { width: 1px; background: var(--border2); margin: 0 4px; }
+
+  select, .btn {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    appearance: none;
+  }
+  select:hover, .btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
+  select:focus { outline: none; border-color: var(--accent); }
+
+  .btn-active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); background: rgba(0,200,255,0.05); }
+  .btn-group { display: flex; }
+  .btn-group .btn:not(:last-child) { border-right: none; }
+
+  /* ── KPI CARDS ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .kpi {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .kpi:hover { border-color: var(--border2); }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--kpi-color, var(--accent));
+    box-shadow: 0 0 10px var(--kpi-color, var(--accent));
+  }
+  .kpi-label { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--text3); text-transform: uppercase; margin-bottom: 8px; }
+  .kpi-value { font-family: var(--head); font-size: 32px; font-weight: 700; color: #fff; line-height: 1; }
+  .kpi-unit { font-family: var(--mono); font-size: 10px; color: var(--kpi-color, var(--accent)); margin-left: 3px; }
+  .kpi-delta {
+    font-family: var(--mono); font-size: 10px; margin-top: 6px;
+    color: var(--text2);
+  }
+  .kpi-delta .up { color: var(--accent2); }
+  .kpi-delta .down { color: var(--accent3); }
+
+  /* ── CHARTS GRID ── */
+  .charts-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .panel {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .panel-title {
+    font-family: var(--head);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--text2);
+    text-transform: uppercase;
+  }
+  .panel-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    border: 1px solid var(--border2);
+    padding: 2px 6px;
+  }
+  .panel-body { padding: 8px; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { border-bottom: 1px solid var(--border2); }
+  th {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
+    color: var(--text3); text-transform: uppercase;
+    padding: 8px 10px; text-align: left; font-weight: 400;
+  }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--border); font-family: var(--body); font-size: 12px; color: var(--text); }
+  tr:hover td { background: rgba(0,200,255,0.03); }
+  .status-on-time { color: var(--accent2); font-family: var(--mono); font-size: 10px; }
+  .status-delayed { color: var(--warn); font-family: var(--mono); font-size: 10px; }
+  .status-cancelled { color: var(--accent3); font-family: var(--mono); font-size: 10px; }
+  .flight-code { font-family: var(--mono); color: var(--accent); font-size: 11px; }
+
+  /* ── RADAR MINI ── */
+  .radar-wrap { position: relative; display: flex; justify-content: center; align-items: center; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg0); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .charts-main, .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">✈</div>
+    <div>
+      <div class="logo-text">AeroMetrics</div>
+      <span class="logo-sub">FLIGHT ANALYTICS SYSTEM v2.4</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE DATA</div>
+    <div class="clock" id="clock">--:--:-- UTC</div>
+  </div>
+</header>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <span class="filter-label">FILTROS</span>
+  <div class="filter-sep"></div>
+  <select id="selAirline" onchange="applyFilters()">
+    <option value="all">TODAS LAS AEROLÍNEAS</option>
+    <option value="Aerolíneas Argentinas">AEROLÍNEAS ARGENTINAS</option>
+    <option value="LATAM">LATAM</option>
+    <option value="Flybondi">FLYBONDI</option>
+    <option value="JetSMART">JETSMART</option>
+    <option value="American Airlines">AMERICAN AIRLINES</option>
+    <option value="Copa Airlines">COPA AIRLINES</option>
+  </select>
+  <div class="filter-sep"></div>
+  <select id="selRoute" onchange="applyFilters()">
+    <option value="all">TODAS LAS RUTAS</option>
+    <option value="EZE-GRU">EZE → GRU</option>
+    <option value="EZE-SCL">EZE → SCL</option>
+    <option value="EZE-BOG">EZE → BOG</option>
+    <option value="EZE-MIA">EZE → MIA</option>
+    <option value="AEP-COR">AEP → COR</option>
+    <option value="AEP-MDZ">AEP → MDZ</option>
+    <option value="AEP-BRC">AEP → BRC</option>
+  </select>
+  <div class="filter-sep"></div>
+  <div class="btn-group">
+    <button class="btn btn-active" onclick="setPeriod(this,'7d')">7D</button>
+    <button class="btn" onclick="setPeriod(this,'30d')">30D</button>
+    <button class="btn" onclick="setPeriod(this,'90d')">90D</button>
+  </div>
+  <div class="filter-sep"></div>
+  <button class="btn" onclick="randomizeData()">⟳ ACTUALIZAR</button>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid" id="kpis"></div>
+
+<!-- CHARTS ROW 1 -->
+<div class="charts-main">
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">VUELOS POR DÍA</span>
+      <span class="panel-tag">SERIE TEMPORAL</span>
+    </div>
+    <div class="panel-body"><div id="chartFlightsDay" style="height:240px"></div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">PUNTUALIDAD POR AEROLÍNEA</span>
+      <span class="panel-tag">COMPARATIVO</span>
+    </div>
+    <div class="panel-body"><div id="chartOnTime" style="height:240px"></div></div>
+  </div>
+</div>
+
+<!-- CHARTS ROW 2 -->
+<div class="charts-row">
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">RUTAS MÁS FRECUENTES</span>
+      <span class="panel-tag">VOLUMEN</span>
+    </div>
+    <div class="panel-body"><div id="chartRoutes" style="height:220px"></div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">ESTADO DE VUELOS</span>
+      <span class="panel-tag">DISTRIBUCIÓN</span>
+    </div>
+    <div class="panel-body"><div id="chartStatus" style="height:220px"></div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">DEMORA PROMEDIO</span>
+      <span class="panel-tag">POR HORA DEL DÍA</span>
+    </div>
+    <div class="panel-body"><div id="chartDelay" style="height:220px"></div></div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="panel" style="margin-bottom:16px">
+  <div class="panel-head">
+    <span class="panel-title">VUELOS RECIENTES</span>
+    <span class="panel-tag">ÚLTIMAS 24H</span>
+  </div>
+  <div class="panel-body table-wrap">
+    <table id="tableFlights">
+      <thead>
+        <tr>
+          <th>Código</th><th>Aerolínea</th><th>Origen</th><th>Destino</th>
+          <th>Hora Salida</th><th>Demora</th><th>Pasajeros</th><th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const airlines = ['Aerolíneas Argentinas','LATAM','Flybondi','JetSMART','American Airlines','Copa Airlines'];
+const routes = [
+  {from:'EZE',to:'GRU'},{from:'EZE',to:'SCL'},{from:'EZE',to:'BOG'},
+  {from:'EZE',to:'MIA'},{from:'AEP',to:'COR'},{from:'AEP',to:'MDZ'},
+  {from:'AEP',to:'BRC'},{from:'EZE',to:'LIM'},{from:'AEP',to:'ROS'}
+];
+const statuses = ['ON TIME','DELAYED','CANCELLED'];
+const statusColors = {'ON TIME':'#00ffc8','DELAYED':'#ffcc00','CANCELLED':'#ff6b35'};
+const airlineCodes = {'Aerolíneas Argentinas':'AR','LATAM':'LA','Flybondi':'FO','JetSMART':'JA','American Airlines':'AA','Copa Airlines':'CM'};
+
+let rawData = [];
+let currentPeriod = '7d';
+let currentAirline = 'all';
+let currentRoute = 'all';
+
+function rnd(a,b){ return Math.random()*(b-a)+a; }
+function rint(a,b){ return Math.floor(rnd(a,b)); }
+
+function generateData() {
+  rawData = [];
+  const days = currentPeriod === '7d' ? 7 : currentPeriod === '30d' ? 30 : 90;
+  const now = new Date();
+  for(let d = days-1; d >= 0; d--) {
+    const date = new Date(now); date.setDate(date.getDate()-d);
+    const numFlights = rint(18, 45);
+    for(let i=0; i<numFlights; i++) {
+      const airline = airlines[rint(0,airlines.length)];
+      const route = routes[rint(0,routes.length)];
+      const hour = rint(5,23);
+      const min = rint(0,59);
+      const delay = Math.random() < 0.65 ? 0 : rint(5, 120);
+      const status = delay === 0 ? 'ON TIME' : (delay > 60 && Math.random()<0.15 ? 'CANCELLED' : 'DELAYED');
+      rawData.push({
+        date: date.toISOString().split('T')[0],
+        airline, route,
+        routeStr: `${route.from}-${route.to}`,
+        hour, min,
+        delay, status,
+        passengers: rint(80, 280),
+        code: `${airlineCodes[airline]||'XX'}${rint(1000,9999)}`
+      });
+    }
+  }
+}
+
+function getFiltered() {
+  return rawData.filter(f =>
+    (currentAirline === 'all' || f.airline === currentAirline) &&
+    (currentRoute === 'all' || f.routeStr === currentRoute)
+  );
+}
+
+// ── PLOTLY CONFIG ─────────────────────────────────────────────────────────────
+const PLY = {
+  paper_bgcolor: 'transparent',
+  plot_bgcolor: 'transparent',
+  font: { family: "'Share Tech Mono', monospace", color: '#6a8fa0', size: 10 },
+  margin: { t: 10, r: 10, b: 36, l: 44 },
+  xaxis: { gridcolor: '#1e3040', linecolor: '#1e3040', tickfont:{color:'#3a5a70',size:9}, zerolinecolor:'#1e3040' },
+  yaxis: { gridcolor: '#1e3040', linecolor: '#1e3040', tickfont:{color:'#3a5a70',size:9}, zerolinecolor:'#1e3040' },
+  showlegend: false,
+  hoverlabel: { bgcolor:'#111820', bordercolor:'#264055', font:{family:"'Share Tech Mono',monospace",color:'#c8dde8',size:11} }
+};
+
+const config = { displayModeBar: false, responsive: true };
+
+// ── RENDERS ───────────────────────────────────────────────────────────────────
+function renderKPIs(data) {
+  const total = data.length;
+  const onTime = data.filter(f=>f.status==='ON TIME').length;
+  const delayed = data.filter(f=>f.status==='DELAYED').length;
+  const cancelled = data.filter(f=>f.status==='CANCELLED').length;
+  const avgDelay = delayed > 0 ? Math.round(data.filter(f=>f.delay>0).reduce((s,f)=>s+f.delay,0) / Math.max(delayed,1)) : 0;
+  const totalPax = data.reduce((s,f)=>s+f.passengers,0);
+  const pct = v => total > 0 ? Math.round(v/total*100) : 0;
+
+  const kpis = [
+    { label:'VUELOS TOTALES', value: total.toLocaleString(), unit:'', delta:`↑ ${rint(2,8)}% vs período ant.`, up:true, color:'#00c8ff' },
+    { label:'PUNTUALIDAD', value: pct(onTime), unit:'%', delta:`${onTime} vuelos a tiempo`, up:pct(onTime)>80, color:'#00ffc8' },
+    { label:'DEMORA PROMEDIO', value: avgDelay, unit:'min', delta:`${delayed} vuelos demorados`, up:false, color:'#ffcc00' },
+    { label:'CANCELACIONES', value: cancelled, unit:'', delta:`${pct(cancelled)}% del total`, up:pct(cancelled)<3, color:'#ff6b35' },
+    { label:'PASAJEROS', value: (totalPax/1000).toFixed(1)+'K', unit:'', delta:`↑ ${rint(1,6)}% vs período ant.`, up:true, color:'#a78bfa' },
+  ];
+
+  document.getElementById('kpis').innerHTML = kpis.map(k => `
+    <div class="kpi" style="--kpi-color:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}<span class="kpi-unit">${k.unit}</span></div>
+      <div class="kpi-delta"><span class="${k.up?'up':'down'}">${k.delta}</span></div>
+    </div>`).join('');
+}
+
+function renderFlightsDay(data) {
+  const byDate = {};
+  data.forEach(f => { byDate[f.date] = (byDate[f.date]||0)+1; });
+  const dates = Object.keys(byDate).sort();
+  const vals = dates.map(d=>byDate[d]);
+
+  Plotly.react('chartFlightsDay', [{
+    x: dates, y: vals, type: 'scatter', mode: 'lines+markers',
+    line: { color: '#00c8ff', width: 2, shape: 'spline' },
+    marker: { color: '#00c8ff', size: 4 },
+    fill: 'tozeroy',
+    fillcolor: 'rgba(0,200,255,0.07)',
+    hovertemplate: '%{x}<br><b>%{y} vuelos</b><extra></extra>'
+  }], { ...PLY, margin:{t:10,r:10,b:40,l:40} }, config);
+}
+
+function renderOnTime(data) {
+  const byAirline = {};
+  airlines.forEach(a => { byAirline[a] = {on:0,total:0}; });
+  data.forEach(f => {
+    if(!byAirline[f.airline]) return;
+    byAirline[f.airline].total++;
+    if(f.status==='ON TIME') byAirline[f.airline].on++;
+  });
+  const names = airlines.filter(a=>byAirline[a].total>0);
+  const pcts = names.map(a => byAirline[a].total>0 ? Math.round(byAirline[a].on/byAirline[a].total*100) : 0);
+
+  Plotly.react('chartOnTime', [{
+    x: pcts, y: names.map(n=>n.replace(' ','\n')),
+    type: 'bar', orientation: 'h',
+    marker: { color: pcts.map(p => p>=85?'#00ffc8':p>=70?'#ffcc00':'#ff6b35'), opacity: 0.85 },
+    hovertemplate: '<b>%{y}</b><br>Puntualidad: %{x}%<extra></extra>'
+  }], { ...PLY, xaxis:{...PLY.xaxis,range:[0,100],ticksuffix:'%'}, margin:{t:10,r:20,b:30,l:110} }, config);
+}
+
+function renderRoutes(data) {
+  const byRoute = {};
+  data.forEach(f => { byRoute[f.routeStr] = (byRoute[f.routeStr]||0)+1; });
+  const sorted = Object.entries(byRoute).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const routes = sorted.map(r=>r[0]);
+  const counts = sorted.map(r=>r[1]);
+  const maxC = Math.max(...counts);
+
+  Plotly.react('chartRoutes', [{
+    x: routes, y: counts, type: 'bar',
+    marker: {
+      color: counts.map(c => `rgba(0,200,255,${0.3+0.65*(c/maxC)})`),
+      line: { color: '#00c8ff', width: 1 }
+    },
+    hovertemplate: '<b>%{x}</b><br>%{y} vuelos<extra></extra>'
+  }], { ...PLY, margin:{t:10,r:10,b:44,l:40} }, config);
+}
+
+function renderStatus(data) {
+  const counts = {
+    'ON TIME': data.filter(f=>f.status==='ON TIME').length,
+    'DELAYED': data.filter(f=>f.status==='DELAYED').length,
+    'CANCELLED': data.filter(f=>f.status==='CANCELLED').length
+  };
+  Plotly.react('chartStatus', [{
+    values: Object.values(counts),
+    labels: Object.keys(counts),
+    type: 'pie', hole: 0.62,
+    marker: { colors: ['#00ffc8','#ffcc00','#ff6b35'], line:{color:'#0b1017',width:2} },
+    textinfo: 'none',
+    hovertemplate: '<b>%{label}</b><br>%{value} vuelos (%{percent})<extra></extra>'
+  }], {
+    ...PLY,
+    margin:{t:10,r:10,b:10,l:10},
+    annotations:[{
+      text: `${data.length}<br><span style="font-size:9px">vuelos</span>`,
+      x:0.5,y:0.5, showarrow:false,
+      font:{family:"'Share Tech Mono',monospace",size:16,color:'#c8dde8'}
+    }],
+    showlegend: true,
+    legend:{font:{color:'#6a8fa0',size:9},bgcolor:'transparent',orientation:'h',x:0,y:-0.1}
+  }, config);
+}
+
+function renderDelay(data) {
+  const byHour = Array(24).fill(0).map(()=>({sum:0,count:0}));
+  data.forEach(f => {
+    if(f.delay > 0) { byHour[f.hour].sum += f.delay; byHour[f.hour].count++; }
+  });
+  const hours = Array.from({length:24},(_,i)=>i);
+  const avgDelays = hours.map(h => byHour[h].count > 0 ? Math.round(byHour[h].sum/byHour[h].count) : 0);
+
+  Plotly.react('chartDelay', [{
+    x: hours.map(h=>`${String(h).padStart(2,'0')}:00`),
+    y: avgDelays,
+    type: 'bar',
+    marker: {
+      color: avgDelays.map(d => d>60?'rgba(255,107,53,0.8)':d>30?'rgba(255,204,0,0.8)':'rgba(0,200,255,0.6)'),
+      line:{color:'transparent'}
+    },
+    hovertemplate: '%{x}<br><b>%{y} min demora</b><extra></extra>'
+  }], { ...PLY, margin:{t:10,r:6,b:40,l:40} }, config);
+}
+
+function renderTable(data) {
+  const recent = [...data].sort((a,b)=>b.date.localeCompare(a.date)||b.hour-a.hour).slice(0,15);
+  document.getElementById('tableBody').innerHTML = recent.map(f=>`
+    <tr>
+      <td class="flight-code">${f.code}</td>
+      <td>${f.airline}</td>
+      <td>${f.route.from}</td>
+      <td>${f.route.to}</td>
+      <td>${String(f.hour).padStart(2,'0')}:${String(f.min).padStart(2,'0')}</td>
+      <td style="color:${f.delay>0?'#ffcc00':'#00ffc8'}">${f.delay>0?`+${f.delay} min`:'—'}</td>
+      <td>${f.passengers}</td>
+      <td class="status-${f.status.toLowerCase().replace(' ','-')}">${f.status}</td>
+    </tr>`).join('');
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────────
+function applyFilters() {
+  currentAirline = document.getElementById('selAirline').value;
+  currentRoute = document.getElementById('selRoute').value;
+  render();
+}
+
+function setPeriod(btn, period) {
+  document.querySelectorAll('.btn-group .btn').forEach(b=>b.classList.remove('btn-active'));
+  btn.classList.add('btn-active');
+  currentPeriod = period;
+  generateData();
+  render();
+}
+
+function randomizeData() { generateData(); render(); }
+
+function render() {
+  const data = getFiltered();
+  renderKPIs(data);
+  renderFlightsDay(data);
+  renderOnTime(data);
+  renderRoutes(data);
+  renderStatus(data);
+  renderDelay(data);
+  renderTable(data);
+}
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const utc = `${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')} UTC`;
+  document.getElementById('clock').textContent = utc;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+generateData();
+render();
+</script>
+</body>
+</html>
