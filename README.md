@@ -6,7 +6,7 @@ El proyecto simula un sistema de monitoreo aeronáutico con métricas operativas
 ## Vista previa
 
 <p align="center">
-  <img src="./screenshot.png" alt="AeroMetrics Dashboard" width="100%">
+<img width="1692" height="1039" alt="Captura de pantalla 2026-03-26 113353" src="https://github.com/user-attachments/assets/75ce0801-f69c-4646-a550-55709195e700" />
 </p>
 
 ## Características
